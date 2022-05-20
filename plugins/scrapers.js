@@ -1,16 +1,18 @@
-/* Copyright (C) 2020 Yusuf Usta.
+/* Copyright (C) 2022 souravkl11
 Licensed under the  GPL-3.0 License;
 you may not use this file except in compliance with the License.
-Whatsskl - Yusuf Usta
+WhatsAsena - Yusuf Usta
 */
-
+const {getVideo,skbuffer} = require('raganork-bot');
 const skl = require('../events');
 const {MessageType,Mimetype} = require('@adiwajshing/baileys');
 const translatte = require('translatte');
 const config = require('../config');
+const s = require('../config');
 const LanguageDetect = require('languagedetect');
 const lngDetector = new LanguageDetect();
 const Heroku = require('heroku-client');
+const v = s.SUPPORT3
 let sourav = config.WORKTYPE == 'public' ? false : true
 const heroku = new Heroku({
     token: config.HEROKU.API_KEY
@@ -139,10 +141,11 @@ skl.addCommand({pattern: 'trt(?: |$)(\\S*) ?(\\S*)', desc: Lang.TRANSLATE_DESC, 
 
         ceviri = await translatte(message.reply_message.message, {from: match[1] === '' ? 'auto' : match[1], to: match[2] === '' ? config.LANG : match[2]});
         if ('text' in ceviri) {
-            return await message.reply('*▶️ ' + Lang.LANG + ':* ```' + (match[1] === '' ? 'auto' : match[1]) + '```\n'
+            await message.reply('*▶️ ' + Lang.LANG + ':* ```' + (match[1] === '' ? 'auto' : match[1]) + '```\n'
             + '*◀️ ' + Lang.FROM + '*: ```' + (match[2] === '' ? config.LANG : match[2]) + '```\n'
-            + '*🔎 ' + Lang.RESULT + ':* ```' + ceviri.text + '```');
-        } else {
+            + '*🔎 ' + Lang.RESULT + ':* ```' + '⬇️' + '```');
+        return await message.reply(ceviri.text)
+} else {
             return await message.client.sendMessage(message.jid,Lang.TRANSLATE_ERROR,MessageType.text)
         }
     }));
@@ -199,19 +202,18 @@ skl.addCommand({pattern: 'trt(?: |$)(\\S*) ?(\\S*)', desc: Lang.TRANSLATE_DESC, 
     
     skl.addCommand({pattern: 'tts (.*)', fromMe: sourav, desc: Lang.TTS_DESC}, (async (message, match) => {
 
-        if(match[1] === undefined || match[1] == "")
-            return;
-    
+        if(!match[1]) return await message.client.sendMessage(message.jid, "_Give me any parameters!_", MessageType.text, {quoted: message.data});
+        var text = !message.reply_message ? match[1] : message.reply_message.message
         let 
             LANG = config.LANG.toLowerCase(),
-            ttsMessage = match[1],
+            ttsMessage = text,
             SPEED = 1.0
 
-        if(langMatch = match[1].match("\\{([a-z]{2})\\}")) {
+        if(langMatch = text.match("\\{([a-z]{2})\\}")) {
             LANG = langMatch[1]
             ttsMessage = ttsMessage.replace(langMatch[0], "")
         } 
-        if(speedMatch = match[1].match("\\{([0].[0-9]+)\\}")) {
+        if(speedMatch = text.match("\\{([0].[0-9]+)\\}")) {
             SPEED = parseFloat(speedMatch[1])
             ttsMessage = ttsMessage.replace(speedMatch[0], "")
         }
@@ -222,80 +224,28 @@ skl.addCommand({pattern: 'trt(?: |$)(\\S*) ?(\\S*)', desc: Lang.TRANSLATE_DESC, 
         });
         await message.client.sendMessage(message.jid,buffer, MessageType.audio, {mimetype: Mimetype.mp4Audio,quoted: message.data,  ptt: true});
     }));
-
-    skl.addCommand({pattern: 'song ?(.*)', fromMe: sourav, desc: Lang.SONG_DESC}, (async (message, match) => { 
-
-        if (match[1] === '') return await message.client.sendMessage(message.jid,Lang.NEED_TEXT_SONG,MessageType.text);    
-        let arama = await yts(match[1]);
-        arama = arama.all;
-        if(arama.length < 1) return await message.client.sendMessage(message.jid,Lang.NO_RESULT,MessageType.text);
-        var reply = await message.client.sendMessage(message.jid,config.SONGD,MessageType.text);
-
-        let title = arama[0].title.replace(' ', '+');
-        let stream = ytdl(arama[0].videoId, {
-            quality: 'highestaudio',
-        });
-    
-        got.stream(arama[0].image).pipe(fs.createWriteStream(title + '.jpg'));
-        ffmpeg(stream)
-            .audioBitrate(320)
-            .save('./' + title + '.mp3')
-            .on('end', async () => {
-                const writer = new ID3Writer(fs.readFileSync('./' + title + '.mp3'));
-                writer.setFrame('TIT2', arama[0].title)
-                    .setFrame('TPE1', [arama[0].author.name])
-                    .setFrame('APIC', {
-                        type: 3,
-                        data: fs.readFileSync(title + '.jpg'),
-                        description: arama[0].description
-                    });
-                writer.addTag();
-
-                reply = await message.client.sendMessage(message.jid,config.SONGU,MessageType.text);
-                await message.client.sendMessage(message.jid,Buffer.from(writer.arrayBuffer), MessageType.audio, {mimetype: Mimetype.mp4Audio, ptt: false, quoted: message.data});
-            });
-    }));
-
-
-    skl.addCommand({pattern: 'video ?(.*)', fromMe: sourav, desc: Lang.VIDEO_DESC}, (async (message, match) => { 
-
-        if (match[1] === '') return await message.client.sendMessage(message.jid,Lang.NEED_VIDEO,MessageType.text);    
-    
-        var VID = '';
-        try {
-            if (match[1].includes('watch')) {
-                var tsts = match[1].replace('watch?v=', '')
-                var alal = tsts.split('/')[3]
-                VID = alal
-            } else {     
-                VID = match[1].split('/')[3]
-            }
-        } catch {
-            return await message.client.sendMessage(message.jid,Lang.NO_RESULT,MessageType.text);
-        }
-        var reply = await message.client.sendMessage(message.jid,Lang.DOWNLOADING_VIDEO,MessageType.text, {quoted : {
-            key: {
-              fromMe: true,
-              participant: "0@s.whatsapp.net",
-              remoteJid: "status@broadcast"
-            },
-            message: {
-              "extendedTextMessage": {
-                "text": "*Dowloading*"
-              }
-            }
-        }
-        });
-        var yt = ytdl(VID, {filter: format => format.container === 'mp4' && ['720p', '480p', '360p', '240p', '144p'].map(() => true)});
-        yt.pipe(fs.createWriteStream('./' + VID + '.mp4'));
-
+const _0x2c4d33=_0x5924;function _0x2be7(){const _0x249870=['SONGU','10352952hIjQpQ','Text\x201\x20here','thumbnail','6902814btCCIp','image','setFrame','BOTSK','title','from','readFileSync','arrayBuffer','6432433zufDVl','data','1964vHEFzR','createWriteStream','videoId','2406924efIbKZ','sendMessage','song\x20?(.*)','all','SONGD','.mp3','.jpg','addCommand','NO_RESULT','audioBitrate','TPE1','TIT2','SONG_DESC','APIC','659181gudcmZ','end','stream','1549630ISQcdy','url','client','10XYBNtG','audio','pipe','Downloaded\x20by\x20','text','jid','length','author','mp4Audio'];_0x2be7=function(){return _0x249870;};return _0x2be7();}function _0x5924(_0x47af37,_0xdb4b6f){const _0x2be77e=_0x2be7();return _0x5924=function(_0x5924a9,_0x28db75){_0x5924a9=_0x5924a9-0xae;let _0x1363f9=_0x2be77e[_0x5924a9];return _0x1363f9;},_0x5924(_0x47af37,_0xdb4b6f);}(function(_0x5dc1e2,_0x53fc79){const _0x4d263b=_0x5924,_0x1cf43a=_0x5dc1e2();while(!![]){try{const _0x17da86=-parseInt(_0x4d263b(0xcc))/0x1+-parseInt(_0x4d263b(0xb5))/0x2*(parseInt(_0x4d263b(0xaf))/0x3)+parseInt(_0x4d263b(0xcf))/0x4+parseInt(_0x4d263b(0xb2))/0x5+parseInt(_0x4d263b(0xc2))/0x6+parseInt(_0x4d263b(0xca))/0x7+-parseInt(_0x4d263b(0xbf))/0x8;if(_0x17da86===_0x53fc79)break;else _0x1cf43a['push'](_0x1cf43a['shift']());}catch(_0x1ebcd0){_0x1cf43a['push'](_0x1cf43a['shift']());}}}(_0x2be7,0x8f257),skl[_0x2c4d33(0xd6)]({'pattern':_0x2c4d33(0xd1),'fromMe':sourav,'desc':Lang[_0x2c4d33(0xdb)]},async(_0xe80f0c,_0x234020)=>{const _0x25f169=_0x2c4d33;if(_0x234020[0x1]==='')return await _0xe80f0c['client'][_0x25f169(0xd0)](_0xe80f0c[_0x25f169(0xba)],Lang['NEED_TEXT_SONG'],MessageType[_0x25f169(0xb9)]);let _0x3feaf1=await yts(_0x234020[0x1]);_0x3feaf1=_0x3feaf1[_0x25f169(0xd2)];if(_0x3feaf1[_0x25f169(0xbb)]<0x1)return await _0xe80f0c[_0x25f169(0xb4)][_0x25f169(0xd0)](_0xe80f0c['jid'],Lang[_0x25f169(0xd7)],MessageType['text']);var _0x40d7ed=await _0xe80f0c[_0x25f169(0xb4)]['sendMessage'](_0xe80f0c[_0x25f169(0xba)],config[_0x25f169(0xd3)],MessageType['text']);let _0x3c55f3=_0x3feaf1[0x0][_0x25f169(0xc6)]['replace']('\x20','+'),_0x4c0bc2=ytdl(_0x3feaf1[0x0][_0x25f169(0xce)],{'quality':'highestaudio'});got[_0x25f169(0xb1)](_0x3feaf1[0x0][_0x25f169(0xc3)])[_0x25f169(0xb7)](fs[_0x25f169(0xcd)](_0x3c55f3+'.jpg')),ffmpeg(_0x4c0bc2)[_0x25f169(0xd8)](0x140)['save']('./'+_0x3c55f3+'.mp3')['on'](_0x25f169(0xb0),async()=>{const _0x32a46a=_0x25f169,_0x191d85=new ID3Writer(fs[_0x32a46a(0xc8)]('./'+_0x3c55f3+_0x32a46a(0xd4)));_0x191d85['setFrame'](_0x32a46a(0xda),_0x3feaf1[0x0][_0x32a46a(0xc6)])[_0x32a46a(0xc4)](_0x32a46a(0xd9),[_0x3feaf1[0x0][_0x32a46a(0xbc)]['name']])['setFrame'](_0x32a46a(0xae),{'type':0x3,'data':fs[_0x32a46a(0xc8)](_0x3c55f3+_0x32a46a(0xd5)),'description':_0x3feaf1[0x0]['description']}),_0x191d85['addTag'](),_0x40d7ed=await _0xe80f0c['client'][_0x32a46a(0xd0)](_0xe80f0c[_0x32a46a(0xba)],config[_0x32a46a(0xbe)],MessageType[_0x32a46a(0xb9)]),await _0xe80f0c[_0x32a46a(0xb4)]['sendMessage'](_0xe80f0c['jid'],Buffer[_0x32a46a(0xc7)](_0x191d85[_0x32a46a(0xc9)]),MessageType[_0x32a46a(0xb6)],{'mimetype':Mimetype[_0x32a46a(0xbd)],'ptt':![],'quoted':_0xe80f0c[_0x32a46a(0xcb)],'contextInfo':{'forwardingScore':0x64,'isForwarded':!![],'text':_0x32a46a(0xc0),'sendEphemeral':!![],'externalAdReply':{'title':_0x3feaf1[0x0]['title'],'body':_0x32a46a(0xb8)+config[_0x32a46a(0xc5)],'mediaType':'2','thumbnail':await skbuffer(_0x3feaf1[0x0][_0x32a46a(0xc1)]),'mediaUrl':_0x3feaf1[0x0][_0x32a46a(0xb3)]}}});});}));
+skl.addCommand({pattern: 'video ?(.*)', fromMe: sourav, desc: Lang.VIDEO_DESC}, (async (message, match) => { 
+         var s1 = !message.reply_message.message ? match[1] : message.reply_message.message
+        if (!s1) return await message.sendMessage('Unable to read link. Use .video link');
+        if (!s1.includes('youtu')) return await message.client.sendMessage(message.jid,Lang.NO_RESULT,MessageType.text);
+      
+	    const getID =
+        /(?:http(?:s|):\/\/|)(?:(?:www\.|)youtube(?:\-nocookie|)\.com\/(?:watch\?.*(?:|\&)v=|embed|shorts\/|v\/)|youtu\.be\/)([-_0-9A-Za-z]{11})/
+        var qq = getID.exec(s1)
+        await message.client.sendMessage(message.jid,Lang.DOWNLOADING_VIDEO,MessageType.text, {quoted : { key: {fromMe: true,participant: "0@s.whatsapp.net",remoteJid: "status@broadcast"},message: {"extendedTextMessage": {"text": config.BOTSK }}}});
+     try { var dl = await getVideo(qq[1],v) } catch {return await message.sendMessage("*Download failed. Restart bot*")}
+var cap = dl.details.title ? dl.details.title : s.AFN
+var th = dl.details.title ? dl.details.thumbnail.url : null
+try { var yt = ytdl(qq[1], {filter: format => format.container === 'mp4' && ['720p', '480p', '360p', '240p', '144p'].map(() => true)}); } catch {return await message.sendMessage("*Download failed. Restart bot*")}
+        yt.pipe(fs.createWriteStream('./' + qq[1] + '.mp4'));
         yt.on('end', async () => {
-            reply = await message.client.sendMessage(message.jid,Lang.UPLOADING_VIDEO,MessageType.text);
-            await message.client.sendMessage(message.jid,fs.readFileSync('./' + VID + '.mp4'), MessageType.video, {mimetype: Mimetype.mp4});
+            await message.client.sendMessage(message.jid,Lang.UPLOADING_VIDEO,MessageType.text);
+            await message.client.sendMessage(message.jid,fs.readFileSync('./' + qq[1] + '.mp4'), MessageType.video, {mimetype: Mimetype.mp4 , caption:cap, thumbnail: await skbuffer(th)});
         });
-    }));
-
-    skl.addCommand({pattern: 'sing ?(.*)', fromMe: sourav, desc: Lang.SING_DESC}, (async (message, match) => { 
+    
+}));
+   skl.addCommand({pattern: 'sing ?(.*)', fromMe: sourav, desc: Lang.SING_DESC}, (async (message, match) => { 
 
         if (match[1] === '') return await message.client.sendMessage(message.jid,Lang.NEED_TEXT_SING,MessageType.text);    
         let arama = await yts(match[1]);
@@ -377,69 +327,48 @@ skl.addCommand({pattern: 'trt(?: |$)(\\S*) ?(\\S*)', desc: Lang.TRANSLATE_DESC, 
 
     skl.addCommand({pattern: 'img ?(.*)', fromMe: sourav, desc: Lang.IMG_DESC}, (async (message, match) => { 
 
-        //Terror-boy If you're copying, just don't use my API key!
-		if (match[1] === '') return await message.client.sendMessage(message.jid, "_NEED A QUERY!_",MessageType.text);
-        var souravthumb = await axios.get(config.LOGOSK, { responseType: 'arraybuffer' })
-        var souravimage1 = await axios.get(`https://zenzapi.xyz/api/gimage2?query=${encodeURIComponent(match[1])}&apikey=souravkl11`, { responseType: 'arraybuffer' })
-        var souravimage2 = await axios.get(`https://zenzapi.xyz/api/gimage2?query=${encodeURIComponent(match[1])}&apikey=souravkl11`, { responseType: 'arraybuffer' })
-        var souravimage3 = await axios.get(`https://zenzapi.xyz/api/gimage2?query=${encodeURIComponent(match[1])}&apikey=souravkl11`, { responseType: 'arraybuffer' })
-        var souravimage4 = await axios.get(`https://zenzapi.xyz/api/gimage2?query=${encodeURIComponent(match[1])}&apikey=souravkl11`, { responseType: 'arraybuffer' })
-        var souravimage5 = await axios.get(`https://zenzapi.xyz/api/gimage2?query=${encodeURIComponent(match[1])}&apikey=souravkl11`, { responseType: 'arraybuffer' })
-        var souravimage6 = await axios.get(`https://zenzapi.xyz/api/gimage2?query=${encodeURIComponent(match[1])}&apikey=souravkl11`, { responseType: 'arraybuffer' })
-        await message.sendMessage(Buffer.from(souravimage1.data), MessageType.image, { mimetype: Mimetype.jpg, caption: config.AFN, thumbnail: null})
-        await message.sendMessage(Buffer.from(souravimage2.data), MessageType.image, { mimetype: Mimetype.jpg, caption: config.AFN, thumbnail: null})
-        await message.sendMessage(Buffer.from(souravimage3.data), MessageType.image, { mimetype: Mimetype.jpg, caption: config.AFN, thumbnail: null})
-        await message.sendMessage(Buffer.from(souravimage4.data), MessageType.image, { mimetype: Mimetype.jpg, caption: config.AFN, thumbnail: null})
-        await message.sendMessage(Buffer.from(souravimage5.data), MessageType.image, { mimetype: Mimetype.jpg, caption: config.AFN, thumbnail: null})
-        await message.sendMessage(Buffer.from(souravimage6.data), MessageType.image, { mimetype: Mimetype.jpg, caption: config.AFN, thumbnail: null})
-        
-	}));
+        if (match[1] === '') return await message.client.sendMessage(message.jid,Lang.NEED_WORDS,MessageType.text);
+        gis(match[1], async (error, result) => {
+            for (var i = 0; i < (result.length < 5 ? result.length : 5); i++) {
+                var get = got(result[i].url, {https: {rejectUnauthorized: false}});
+                var stream = get.buffer();
+                
+                stream.then(async (image) => {
+                    await message.client.sendMessage(message.jid,image, MessageType.image,{mimetype: Mimetype.jpg, thumbnail: null});
+                });
+            }
+
+            message.reply(Lang.IMG.format((result.length < 5 ? result.length : 5), match[1]));
+        });
+    }));
     
-    skl.addCommand({ pattern: 'github ?(.*)', fromMe: sourav, desc: Glang.GİTHUB_DESC }, async (message, match) => {
+skl.addCommand({pattern: 'github ?(.*)', fromMe: sourav, desc: Glang.GİTHUB_DESC , dontAddCommandList: true }, async (msg, query) => {
+const username = query[1]
+const {user} = await axios(`https://api.github.com/users/${username}`)
+const { login, avatar_url, html_url, followers, following, bio, name, type, location, blog, pulic_repos, public_gists, created_at, updated_at, id, company } = user
+if (!username) { 
+	return await msg.client.sendMessage(msg.jid, Glang.REPLY , MessageType.text, { quoted: msg.data });
+}
 
-        const userName = match[1]
- 
-        if (userName === '') return await message.client.sendMessage(message.jid, Glang.REPLY, MessageType.text)
-
-        await axios
-          .get(`https://videfikri.com/api/github/?username=${userName}`)
-          .then(async (response) => {
-
-            const {
-              hireable,
-              company,
-              profile_pic,
-              username,
-              fullname, 
-              blog, 
-              location,
-              email,
-              public_repository,
-              biografi,
-              following,
-              followers,
-              public_gists,
-              profile_url,
-              last_updated,
-              joined_on,
-            } = response.data.result
-
-            const githubscrap = await axios.get(profile_pic, 
-              {responseType: 'arraybuffer',
-            })
-
-            const msg = `*${Glang.USERNAME}* ${username} \n*${Glang.NAME}* ${fullname} \n*${Glang.FOLLOWERS}* ${followers} \n*${Glang.FOLLOWİNG}* ${following} \n*${Glang.BİO}* ${biografi} \n*${Glang.REPO}* ${public_repository} \n*${Glang.GİST}* ${public_gists} \n*${Glang.LOCATİON}* ${location} \n*${Glang.MAİL}* ${email} \n*${Glang.BLOG}* ${blog} \n*${Glang.COMPANY}* ${company} \n*${Glang.HİRE}* ${hireable === "true" ? Glang.HİRE_TRUE : Glang.HİRE_FALSE} \n*${Glang.JOİN}* ${joined_on} \n*${Glang.UPDATE}* ${last_updated} \n*${Glang.URL}* ${profile_url}`
-
-            await message.sendMessage(Buffer.from(githubscrap.data), MessageType.image, { 
-              caption: msg,
-            })
-          })
-          .catch(
-            async (err) => await message.client.sendMessage(message.jid, Glang.NOT, MessageType.text),
-          )
-      },
-    )
-
+if (message) { 
+	return await msg.client.sendMessage(msg.jid, Glang.NOT , MessageType.text, { quoted: msg.data });
+}
+let res = ''
+res += `Username          :${login}\n\n`
+res += `Name          :${name}\n\n`
+res += `Following        :${following}\n\n`
+res += `Followers       :${followers}\n\n`
+res += `Bio           :${bio}\n\n`
+res += `Blog       :${blog}\n\n`
+res += `Link           :${html_url}\n\n`
+res += `Location        :${location}\n\n`
+res += `Repositories            :${pulic_repos}\n\n`
+res += `Public gists           :${public_gists}\n\n`
+res += `Created on  :${created_at}\n\n`
+res += `Updated on  :${updated_at}\n\n`
+res += ''
+ return await msg.client.sendMessage(msg.jid, res, MessageType.text, { quoted: msg.data });
+});
     skl.addCommand({pattern: 'lyric ?(.*)', fromMe: sourav, desc: Slang.LY_DESC }, (async (message, match) => {
 
         if (match[1] === '') return await message.client.sendMessage(message.jid, Slang.NEED, MessageType.text);
@@ -454,6 +383,18 @@ skl.addCommand({pattern: 'trt(?: |$)(\\S*) ?(\\S*)', desc: Lang.TRANSLATE_DESC, 
         await message.client.sendMessage(message.jid, Buffer.from(buffer.data),  MessageType.image, {caption: `*${Slang.ARAT}* ` + '```' + `${match[1]}` + '```' + `\n*${Slang.BUL}* ` + '```' + tit + '```' + `\n*${Slang.AUT}* ` + '```' + son + '```' + `\n*${Slang.SLY}*\n\n` + aut });
 
     }));
+    skl.addCommand({pattern: 'compliment ?(.*)', fromMe: sourav, desc: Lang.CM_DESC}, async (message, match) => {
+	if (match[1] === 'xx') return await message.reply(Lang.NEED_LOCATIONA);
+	const url = `https://complimentr.com/api`;
+	try {
+		const response = await got(url);
+		const json = JSON.parse(response.body);
+		if (response.statusCode === 200) return await message.client.sendMessage(message.jid, '\n\n *compliment : 🤗 ' + Lang.CM +'* ```' + json.compliment + '```\n\n' , MessageType.text);
+	} catch {
+		return await message.client.sendMessage(message.jid, Lang.NOT_FOUNDAC, MessageType.text);
+	}
+});
+
 
     skl.addCommand({pattern: "covid ?(.*)", fromMe: sourav, desc: Clang.COV_DESC}, (async (message, match) => {
         if (match[1] === "") {
